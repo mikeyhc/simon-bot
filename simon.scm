@@ -11,8 +11,20 @@
 
 (define quit-regex (regexp "simon:? quit" #t #f #t))
 (define id-regex (regexp "simon:? id .*" #t #f #t))
+(define idto-regex (regexp "simon:? idto .*" #t #f #t))
 (define simon-regex (regexp "simon" #t #f #t))
 
+(define (id-func body)
+  (string-drop body (if (string= (substring/shared body 5 6) ":") 10 9)))
+
+(define (idto-func body)
+  (let* ([body-tail 
+           (string-drop body 
+                        (if (string= (substring/shared body 5 6) ":") 12 11))]
+         [space-idx (string-index body-tail #\space)])
+    (values (string-take body-tail space-idx)
+            (string-trim-both (string-drop body-tail space-idx)
+                              (char-set #\space #\tab)))))
 (define (handle-priv msg)
   (let* ([params (irc:message-parameters msg)]
          [source (if (string-prefix? "#" (car params))
@@ -22,13 +34,10 @@
     (printf "handling message ~A~N" body)
     (cond [(string-match quit-regex body) (exit)]
           [(string-match id-regex body) 
-           (irc:say 
-             simon-conn 
-             (string-drop 
-               body 
-               (if (string= (substring/shared body 5 6) ":")
-                 10 9))
-             source)]
+           (irc:say simon-conn (id-func body) source)]
+          [(string-match idto-regex body)
+           (let-values ([(chan msg) (idto-func body)])
+             (irc:say simon-conn msg chan))]
           [(string-match simon-regex body)
            (irc:say simon-conn "piss off" source)])))
 
